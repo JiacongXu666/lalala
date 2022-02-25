@@ -1,0 +1,1 @@
+python tools/train_simple_single.py --cfg experiments/cityscapes/diff_ddrnet23.yaml
