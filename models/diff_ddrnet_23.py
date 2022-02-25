@@ -385,15 +385,23 @@ class DualResNet(nn.Module):
         else:
             return x_      
 
-def DualResNet_imagenet(cfg, pretrained=False):
+def DualResNet_imagenet(cfg, pretrained=True):
     model = DualResNet(BasicBlock, [2, 2, 2, 2], num_classes=19, planes=64, spp_planes=128, head_planes=128, augment=True)
     if pretrained:
-        pretrained_state = torch.load(cfg.MODEL.PRETRAINED, map_location='cpu') 
-        model_dict = model.state_dict()
-        pretrained_state = {k[6:]: v for k, v in pretrained_state.items() if (k[6:] in model_dict and v.shape == model_dict[k[6:]].shape)}
-        model_dict.update(pretrained_state)
-        print('Loaded {} parameters!'.format(len(pretrained_state)))
-        model.load_state_dict(model_dict, strict = False)
+        if 'cityscapes' in cfg.MODEL.PRETRAINED:
+            pretrained_state = torch.load(cfg.MODEL.PRETRAINED, map_location='cpu') 
+            model_dict = model.state_dict()
+            pretrained_state = {k[6:]: v for k, v in pretrained_state.items() if (k[6:] in model_dict and v.shape == model_dict[k[6:]].shape)}
+            model_dict.update(pretrained_state)
+            print('Loaded {} parameters!'.format(len(pretrained_state)))
+            model.load_state_dict(model_dict, strict = False)
+        else:
+            pretrained_state = torch.load(cfg.MODEL.PRETRAINED, map_location='cpu') 
+            model_dict = model.state_dict()
+            pretrained_state = {k : v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
+            model_dict.update(pretrained_state)
+            print('Loaded {} parameters!'.format(len(pretrained_state)))
+            model.load_state_dict(model_dict, strict = False)
     return model
 
 def get_seg_model(cfg, **kwargs):
@@ -403,7 +411,7 @@ def get_seg_model(cfg, **kwargs):
 
 if __name__ == '__main__':
     
-    
+    """
     x = torch.rand(1, 3, 1024, 2048).cuda()
     net = DualResNet(BasicBlock, [2, 2, 2, 2], num_classes=19, planes=64, spp_planes=128, head_planes=128, augment=False).cuda()
     num_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
@@ -413,18 +421,26 @@ if __name__ == '__main__':
         y = net(x)
     b = time.time()
     print(100/(b-a))
+    """
     
 
 
-"""
+
     pretrained = True
     model = DualResNet(BasicBlock, [2, 2, 2, 2], num_classes=19, planes=64, spp_planes=128, head_planes=128, augment=True)
+    filename = 'C:/Files/2022_github/lalala_test/pretrained_models/cityscapes/ddrnet_23.pth'
     if pretrained:
-        filename = 'D:/panoptic/semantic/test3/pretrained_models/cityscapes/ddrnet/ddrnet_23.pth'
-        pretrained_state = torch.load(filename, map_location='cpu') 
-        model_dict = model.state_dict()
-        pretrained_state = {k[6:]: v for k, v in pretrained_state.items() if (k[6:] in model_dict and v.shape == model_dict[k[6:]].shape)}
-        model_dict.update(pretrained_state)
-        print('Loaded {} parameters!'.format(len(pretrained_state)))
-        model.load_state_dict(model_dict, strict = False) 
-"""
+        if 'cityscapes' in filename:
+            pretrained_state = torch.load(filename, map_location='cpu') 
+            model_dict = model.state_dict()
+            pretrained_state = {k[6:]: v for k, v in pretrained_state.items() if (k[6:] in model_dict and v.shape == model_dict[k[6:]].shape)}
+            model_dict.update(pretrained_state)
+            print('Loaded {} parameters!'.format(len(pretrained_state)))
+            model.load_state_dict(model_dict, strict = False)
+        else:
+            pretrained_state = torch.load(filename, map_location='cpu') 
+            model_dict = model.state_dict()
+            pretrained_state = {k : v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
+            model_dict.update(pretrained_state)
+            print('Loaded {} parameters!'.format(len(pretrained_state)))
+            model.load_state_dict(model_dict, strict = False)
