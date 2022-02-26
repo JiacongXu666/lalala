@@ -7,6 +7,7 @@ from torch.nn import init
 from collections import OrderedDict
 import time
 from . import model_utils
+import logging
 
 BatchNorm2d = nn.BatchNorm2d
 bn_mom = 0.1
@@ -393,14 +394,20 @@ def DualResNet_imagenet(cfg, pretrained=True):
             model_dict = model.state_dict()
             pretrained_state = {k[6:]: v for k, v in pretrained_state.items() if (k[6:] in model_dict and v.shape == model_dict[k[6:]].shape)}
             model_dict.update(pretrained_state)
-            print('Loaded {} parameters!'.format(len(pretrained_state)))
+            msg = 'Loaded {} parameters!'.format(len(pretrained_state))
+            logging.info('Attention!!!')
+            logging.info(msg)
+            logging.info('Over!!!')
             model.load_state_dict(model_dict, strict = False)
         else:
             pretrained_state = torch.load(cfg.MODEL.PRETRAINED, map_location='cpu') 
             model_dict = model.state_dict()
             pretrained_state = {k : v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
             model_dict.update(pretrained_state)
-            print('Loaded {} parameters!'.format(len(pretrained_state)))
+            msg = 'Loaded {} parameters!'.format(len(pretrained_state))
+            logging.info('Attention!!!')
+            logging.info(msg)
+            logging.info('Over!!!')
             model.load_state_dict(model_dict, strict = False)
     return model
 
