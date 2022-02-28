@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.nn import init
 from collections import OrderedDict
 import time
-import model_utils
+from . import model_utils
 import logging
 
 BatchNorm2d = nn.BatchNorm2d
@@ -262,8 +262,8 @@ class PIDNet_L(nn.Module):
 
         self.spp = DAPPM(planes * 16, spp_planes, planes * 4)
 
-        self.bag = model_utils.BagFM(planes * 4, planes * 2, planes * 4)
-        #self.dfm = model_utils.DFM(planes * 4, planes * 4)
+        #self.bag = model_utils.BagFM(planes * 4, planes * 2, planes * 4)
+        self.dfm = model_utils.DFM(planes * 4, planes * 4)
 
         if self.augment:
             self.seghead_p = segmenthead(highres_planes, head_planes, num_classes)
@@ -358,7 +358,7 @@ class PIDNet_L(nn.Module):
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=False)
 
-        x_ = self.final_layer(self.bag(x_, x, x_d))
+        x_ = self.final_layer(self.dfm(x_, x, x_d))
 
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)

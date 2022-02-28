@@ -27,4 +27,5 @@ from __future__ import print_function
 #import models.hrunet
 #mport models.hrunetv2
 import models.diff_ddrnet_23
-import models.pidnet_large
+import models.pidnet_large_dfm
+import models.pidnet_large_bag

@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.nn import init
 from collections import OrderedDict
 import time
-import model_utils
+from . import model_utils
 import logging
 
 BatchNorm2d = nn.BatchNorm2d
