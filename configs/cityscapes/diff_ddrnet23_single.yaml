@@ -52,5 +52,5 @@ TEST:
   BATCH_SIZE_PER_GPU: 6
   FLIP_TEST: true
   MULTI_SCALE: false
-  MODEL_FILE: "pretrained_models/best_val.pth"
+  MODEL_FILE: false
   OUTPUT_INDEX: 1

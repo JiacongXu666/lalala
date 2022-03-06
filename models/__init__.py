@@ -12,7 +12,7 @@ from __future__ import print_function
 #import models.seg_hrnet_ocr
 #import models.ddrnet_23_slim
 #import models.ddrnet_23_slim_test
-#import models.ddrnet_23
+import models.ddrnet_23
 #import models.ddrnet_39
 
 #import models.hrednet
@@ -29,3 +29,4 @@ from __future__ import print_function
 import models.diff_ddrnet_23
 import models.pidnet_large_dfm
 import models.pidnet_large_bag
+import models.pidnet_large_uni_pappm_nonfm
