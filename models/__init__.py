@@ -32,3 +32,5 @@ import models.pidnet_large_bag
 import models.pidnet_large_uni_pappm_nonfm
 import models.pidnet_large_uni_pappm_nonfm2
 import models.pidnet_large_uni_pappm_nonfm3
+import models.pidnet_large_uniPag_pappm_nonfm
+import models.pidnet_large_bi_pappm_nonfm
