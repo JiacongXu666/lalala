@@ -158,7 +158,80 @@ class PAPPM(nn.Module):
         scale_out = self.scale_process(torch.cat(scale_list, 1))
        
         out = self.compression(torch.cat([x_,scale_out], 1)) 
-        return out 
+        return out
+    
+class Light_PAPPM(nn.Module):
+    def __init__(self, inplanes, branch_planes, outplanes, BatchNorm=nn.BatchNorm2d):
+        super(Light_PAPPM, self).__init__()
+        bn_mom = 0.1
+        self.scale1 = nn.Sequential(nn.AvgPool2d(kernel_size=5, stride=2, padding=2),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale2 = nn.Sequential(nn.AvgPool2d(kernel_size=9, stride=4, padding=4),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale3 = nn.Sequential(nn.AvgPool2d(kernel_size=17, stride=8, padding=8),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale4 = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False)
+                                    )
+
+        self.scale0 = nn.Sequential(
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=False),
+                                    )
+        self.scale_share = nn.Sequential(
+                                    BatchNorm(outplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(outplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        
+        self.scale_process = nn.Sequential(
+                                    BatchNorm(branch_planes*4, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes*4, branch_planes*4, kernel_size=1, groups=4, bias=False),
+                                    )
+
+      
+        self.compression = nn.Sequential(
+                                    BatchNorm(branch_planes * 4 + outplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes * 4 + outplanes, outplanes, kernel_size=1, bias=False),
+                                    )
+
+
+    def forward(self, x):
+
+        #x = self.downsample(x)
+        width = x.shape[-1]
+        height = x.shape[-2]        
+        scale_list = []
+
+        x_= self.scale0(x)
+        x_share = self.scale_share(x_)
+        scale_list.append(F.interpolate(self.scale1(x), size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_share)
+        scale_list.append(F.interpolate(self.scale2(x), size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_share)
+        scale_list.append(F.interpolate(self.scale3(x), size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_share)
+        scale_list.append(F.interpolate(self.scale4(x), size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_share)
+        
+        scale_out = self.scale_process(torch.cat(scale_list, 1))
+       
+        out = self.compression(torch.cat([x_,scale_out], 1)) 
+        return out
     
 class PagFM(nn.Module):
     def __init__(self, in_channels, mid_channels, after_relu=False, with_channel=False, BatchNorm=nn.BatchNorm2d):
@@ -185,18 +258,23 @@ class PagFM(nn.Module):
             self.relu = nn.ReLU(inplace=True)
         
     def forward(self, x, y):
+        input_size = x.size()
         if self.after_relu:
             y = self.relu(y)
             x = self.relu(x)
         
         y_q = self.f_y(y)
+        y_q = F.interpolate(y_q, size=[input_size[2], input_size[3]],
+                            mode='bilinear', align_corners=False)
         x_k = self.f_x(x)
         
         if self.with_channel:
             sim_map = torch.sigmoid(self.up(x_k * y_q))
         else:
             sim_map = torch.sigmoid(torch.sum(x_k * y_q, dim=1).unsqueeze(1))
-
+        
+        y = F.interpolate(y, size=[input_size[2], input_size[3]],
+                            mode='bilinear', align_corners=False)
         x = (1-sim_map)*x + sim_map*y
         
         return x
@@ -327,11 +405,11 @@ class PAM(nn.Module):
         y_k = y_k.unfold(2, self.stride, self.stride).unfold(3, self.stride, self.stride).contiguous()
         y_k = y_k.permute(0,2,3,1,4,5).view(input_size[0],input_size[2],input_size[3],self.mid_channels,-1)
         y_v = y_v.unfold(2, self.stride, self.stride).unfold(3, self.stride, self.stride).contiguous()
-        y_v = y_v.permute(0,2,3,4,5,1).view(input_size[0],input_size[2],input_size[3],-1,self.mid_channels)
+        y_v = y_v.permute(0,2,3,4,5,1).view(input_size[0],input_size[2],input_size[3],-1,input_size[1])
         
         sim_map = torch.matmul(x_q, y_k)
         sim_map_div_C = F.softmax(sim_map, dim=-1)
-        out = torch.matmul(sim_map_div_C, y_v).squeeze(3).permute(0,3,1,2)
+        out = torch.matmul(sim_map_div_C, y_v).squeeze(3).permute(0,3,1,2) + x
         
         return out
 
