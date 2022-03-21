@@ -109,18 +109,13 @@ class PAPPM(nn.Module):
         self.scale4 = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
                                     BatchNorm(inplanes, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
-                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False)
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
                                     )
 
         self.scale0 = nn.Sequential(
                                     BatchNorm(inplanes, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
-                                    nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=False),
-                                    )
-        self.scale_share = nn.Sequential(
-                                    BatchNorm(outplanes, momentum=bn_mom),
-                                    nn.ReLU(inplace=True),
-                                    nn.Conv2d(outplanes, branch_planes, kernel_size=1, bias=False),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
                                     )
         
         self.scale_process = nn.Sequential(
@@ -131,9 +126,15 @@ class PAPPM(nn.Module):
 
       
         self.compression = nn.Sequential(
-                                    BatchNorm(branch_planes * 4 + outplanes, momentum=bn_mom),
+                                    BatchNorm(branch_planes * 5, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
-                                    nn.Conv2d(branch_planes * 4 + outplanes, outplanes, kernel_size=1, bias=False),
+                                    nn.Conv2d(branch_planes * 5, outplanes, kernel_size=1, bias=False),
+                                    )
+        
+        self.shortcut = nn.Sequential(
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=False),
                                     )
 
 
@@ -145,24 +146,23 @@ class PAPPM(nn.Module):
         scale_list = []
 
         x_= self.scale0(x)
-        x_share = self.scale_share(x_)
         scale_list.append(F.interpolate(self.scale1(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_share)
+                        mode='bilinear', align_corners=algc)+x_)
         scale_list.append(F.interpolate(self.scale2(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_share)
+                        mode='bilinear', align_corners=algc)+x_)
         scale_list.append(F.interpolate(self.scale3(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_share)
+                        mode='bilinear', align_corners=algc)+x_)
         scale_list.append(F.interpolate(self.scale4(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_share)
+                        mode='bilinear', align_corners=algc)+x_)
         
         scale_out = self.scale_process(torch.cat(scale_list, 1))
        
-        out = self.compression(torch.cat([x_,scale_out], 1)) 
+        out = self.compression(torch.cat([x_,scale_out], 1)) + self.shortcut(x)
         return out
     
-class Light_PAPPM(nn.Module):
+class Light_DAPPM(nn.Module):
     def __init__(self, inplanes, branch_planes, outplanes, BatchNorm=nn.BatchNorm2d):
-        super(Light_PAPPM, self).__init__()
+        super(Light_DAPPM, self).__init__()
         bn_mom = 0.1
         self.scale1 = nn.Sequential(nn.AvgPool2d(kernel_size=5, stride=2, padding=2),
                                     BatchNorm(inplanes, momentum=bn_mom),
@@ -182,31 +182,112 @@ class Light_PAPPM(nn.Module):
         self.scale4 = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
                                     BatchNorm(inplanes, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
-                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False)
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale0 = nn.Sequential(
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        
+        self.process1 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.process2 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.process3 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=1, padding=0, bias=False),
+                                    )
+        self.process4 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=3, padding=1, bias=False),
+                                    )  
+        self.compression = nn.Sequential(
+                                    BatchNorm(branch_planes * 5, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes * 5, outplanes, kernel_size=1, bias=False),
+                                    )
+        self.shortcut = nn.Sequential(
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=False),
+                                    )
+
+    def forward(self, x):
+
+        #x = self.downsample(x)
+        width = x.shape[-1]
+        height = x.shape[-2]        
+        x_list = []
+
+        x_list.append(self.scale0(x))
+        x_list.append(self.process1((F.interpolate(self.scale1(x),
+                        size=[height, width],
+                        mode='bilinear')+x_list[0])))
+        x_list.append((self.process2((F.interpolate(self.scale2(x),
+                        size=[height, width],
+                        mode='bilinear')+x_list[1]))))
+        x_list.append(self.process3((F.interpolate(self.scale3(x),
+                        size=[height, width],
+                        mode='bilinear')+x_list[2])))
+        x_list.append(self.process4((F.interpolate(self.scale4(x),
+                        size=[height, width],
+                        mode='bilinear')+x_list[3])))
+       
+        out = self.compression(torch.cat(x_list, 1)) + self.shortcut(x)
+        return out 
+    
+class Light_PAPPM(nn.Module):
+    def __init__(self, inplanes, branch_planes, outplanes, BatchNorm=nn.BatchNorm2d):
+        super(Light_PAPPM, self).__init__()
+        bn_mom = 0.1
+        self.scale1 = nn.Sequential(nn.AdaptiveAvgPool2d((8,8)),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale2 = nn.Sequential(nn.AdaptiveAvgPool2d((4,4)),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale3 = nn.Sequential(nn.AdaptiveAvgPool2d((2,2)),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
                                     )
 
         self.scale0 = nn.Sequential(
                                     BatchNorm(inplanes, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
-                                    nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=False),
-                                    )
-        self.scale_share = nn.Sequential(
-                                    BatchNorm(outplanes, momentum=bn_mom),
-                                    nn.ReLU(inplace=True),
-                                    nn.Conv2d(outplanes, branch_planes, kernel_size=1, bias=False),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
                                     )
         
         self.scale_process = nn.Sequential(
-                                    BatchNorm(branch_planes*4, momentum=bn_mom),
+                                    BatchNorm(branch_planes*3, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
-                                    nn.Conv2d(branch_planes*4, branch_planes*4, kernel_size=1, groups=4, bias=False),
+                                    nn.Conv2d(branch_planes*3, branch_planes*3, kernel_size=1, padding=0, groups=3, bias=False),
                                     )
 
       
         self.compression = nn.Sequential(
-                                    BatchNorm(branch_planes * 4 + outplanes, momentum=bn_mom),
+                                    BatchNorm(branch_planes * 4, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
-                                    nn.Conv2d(branch_planes * 4 + outplanes, outplanes, kernel_size=1, bias=False),
+                                    nn.Conv2d(branch_planes * 4, outplanes, kernel_size=1, bias=False),
+                                    )
+        
+        self.shortcut = nn.Sequential(
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=False),
                                     )
 
 
@@ -217,22 +298,21 @@ class Light_PAPPM(nn.Module):
         height = x.shape[-2]        
         scale_list = []
 
-        x_= self.scale0(x)
-        x_share = self.scale_share(x_)
+        x_ = self.scale0(x)
         scale_list.append(F.interpolate(self.scale1(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_share)
+                        mode='bilinear', align_corners=algc)+x_)
         scale_list.append(F.interpolate(self.scale2(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_share)
+                        mode='bilinear', align_corners=algc)+x_)
         scale_list.append(F.interpolate(self.scale3(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_share)
-        scale_list.append(F.interpolate(self.scale4(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_share)
+                        mode='bilinear', align_corners=algc)+x_)
+
         
         scale_out = self.scale_process(torch.cat(scale_list, 1))
        
-        out = self.compression(torch.cat([x_,scale_out], 1)) 
+        out = self.compression(torch.cat([x_,scale_out], 1)) + self.shortcut(x)
         return out
     
+
 class PagFM(nn.Module):
     def __init__(self, in_channels, mid_channels, after_relu=False, with_channel=False, BatchNorm=nn.BatchNorm2d):
         super(PagFM, self).__init__()
@@ -351,9 +431,83 @@ class BagFM(nn.Module):
         
         return p_add + i_add + d_add
 
+class BGFM(nn.Module):
+    def __init__(self, in_channels, mid_channels, out_channels, BatchNorm=nn.BatchNorm2d):
+        super(BGFM, self).__init__()
+
+        self.conv_out = nn.Sequential(
+                                nn.Conv2d(in_channels, out_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(out_channels)
+                                )
+        self.f_p = nn.Sequential(
+                                nn.Conv2d(in_channels, mid_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(mid_channels)
+                                )
+        self.f_i = nn.Sequential(
+                                nn.Conv2d(in_channels, mid_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(mid_channels)
+                                )
+        self.f_d = nn.Sequential(
+                                nn.Conv2d(in_channels, mid_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(mid_channels)
+                                )
+
+        
+    def forward(self, p, i, d):
+        
+        d_q = self.f_d(d)
+        i_k = self.f_i(i)
+        p_k = self.f_p(p)
+        sim_map = torch.softmax(torch.cat([torch.sum(d_q*i_k, dim=1).unsqueeze(1), torch.sum(d_q*p_k, dim=1).unsqueeze(1)], dim=1), dim=1)
+        out = sim_map[:,:-1,:,:]*i + sim_map[:,1:,:,:]*p + d
+        out = self.conv_out(out)
+        
+        return out
+class DDFM(nn.Module):
+    def __init__(self, in_channels, out_channels, BatchNorm=nn.BatchNorm2d):
+        super(DDFM, self).__init__()
+        self.conv_p = nn.Sequential(
+                                nn.Conv2d(in_channels, out_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(out_channels)
+                                )
+        self.conv_i = nn.Sequential(
+                                nn.Conv2d(in_channels, out_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(out_channels)
+                                )
+        
+    def forward(self, p, i, d):
+        edge_att = torch.sigmoid(d)
+        
+        p_add = self.conv_p((1-edge_att)*i + p + d)
+        i_add = self.conv_i(i + (1-edge_att)*p + d)
+        
+        return p_add + i_add
+    
 class DFM(nn.Module):
     def __init__(self, in_channels, out_channels, BatchNorm=nn.BatchNorm2d):
         super(DFM, self).__init__()
+
+        self.conv = nn.Sequential(
+                                BatchNorm(in_channels),
+                                nn.ReLU(inplace=True),
+                                nn.Conv2d(in_channels, out_channels, 
+                                          kernel_size=1, padding=0, bias=False)                  
+                                )
+
+        
+    def forward(self, p, i, d):
+        edge_att = torch.sigmoid(d)
+        return self.conv(edge_att*p + (1-edge_att)*i)
+    
+class DFM3(nn.Module):
+    def __init__(self, in_channels, out_channels, BatchNorm=nn.BatchNorm2d):
+        super(DFM3, self).__init__()
 
         self.conv = nn.Sequential(
                                 BatchNorm(in_channels),
