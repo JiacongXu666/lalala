@@ -51,6 +51,41 @@ class BasicBlock(nn.Module):
             return out
         else:
             return self.relu(out)
+        
+class SimpleBlock(nn.Module):
+    expansion = 1
+
+    def __init__(self, inplanes, planes, stride=1, downsample=None, no_relu=False):
+        super(SimpleBlock, self).__init__()
+        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.bn1 = BatchNorm2d(planes, momentum=bn_mom)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=1, bias=False)
+        self.bn2 = BatchNorm2d(planes, momentum=bn_mom)
+        self.downsample = downsample
+        self.stride = stride
+        self.no_relu = no_relu
+
+    def forward(self, x):
+        residual = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        if self.downsample is not None:
+            residual = self.downsample(x)
+
+        out += residual
+
+        if self.no_relu:
+            return out
+        else:
+            return self.relu(out)
+
 
 class Bottleneck(nn.Module):
     expansion = 2
@@ -155,8 +190,8 @@ class PIDNet_L(nn.Module):
         self.pag4 = model_utils.PagFM(highres_planes, planes)
         
         self.diff3 = nn.Sequential(
-                                    nn.Conv2d(planes * 4, planes*1, kernel_size=3, padding=1, bias=False),
-                                    BatchNorm2d(planes*1, momentum=bn_mom),
+                                    nn.Conv2d(planes * 4, planes*2, kernel_size=3, padding=1, bias=False),
+                                    BatchNorm2d(planes*2, momentum=bn_mom),
                                     )
         self.diff4 = nn.Sequential(
                                  nn.Conv2d(planes * 8, highres_planes, kernel_size=3, padding=1, bias=False),
@@ -167,10 +202,10 @@ class PIDNet_L(nn.Module):
         
 
         self.layer3_ = self._make_layer(block, planes * 2, highres_planes, 3)
-        self.layer3_d = self._make_single_layer(block, planes * 2, planes)
+        self.layer3_d = self._make_single_layer(SimpleBlock, planes * 2, planes * 2)
 
         self.layer4_ = self._make_layer(block, highres_planes, highres_planes, 3)
-        self.layer4_d = self._make_layer(Bottleneck, planes, planes, 1)
+        self.layer4_d = self._make_single_layer(SimpleBlock, planes * 2, planes * 2)
 
         self.layer5_ = self._make_layer(Bottleneck, highres_planes, highres_planes, 1)
         self.layer5_d = self._make_layer(Bottleneck, planes*2, highres_planes, 1)
@@ -183,7 +218,7 @@ class PIDNet_L(nn.Module):
 
         if self.augment:
             self.seghead_p = segmenthead(highres_planes, head_planes, num_classes)
-            self.seghead_d = segmenthead(highres_planes, highres_planes//2, 1)           
+            self.seghead_d = segmenthead(highres_planes, highres_planes, 1)           
 
         self.final_layer = segmenthead(planes * 4, head_planes, num_classes)
 
@@ -297,7 +332,7 @@ def get_seg_model(cfg, **kwargs):
     return model
 
 if __name__ == '__main__':
-    """
+    
     device = torch.device('cuda')
     #torch.backends.cudnn.enabled = True
     #torch.backends.cudnn.benchmark = True
@@ -341,11 +376,11 @@ if __name__ == '__main__':
     torch.cuda.empty_cache()
     FPS = 1000 / latency
     print(FPS)
-    """
-        
 
+        
+    """
     model = PIDNet_L(BasicBlock, [3, 3, 4, 4], num_classes=19, planes=64, spp_planes=96, head_planes=256, augment=True)
-    filename = 'D:/ImageNet/imagenet_test/checkpoints/imagenet/pidnet_l_nonD/model_best.pth.tar'
+    filename = 'D:/ImageNet/imagenet_test/checkpoints/imagenet/pidnet_l_64_dfm/model_best.pth.tar'
     pretrained_state = torch.load(filename, map_location='cpu')['state_dict'] 
     model_dict = model.state_dict()
     pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
@@ -355,6 +390,7 @@ if __name__ == '__main__':
     logging.info(msg)
     logging.info('Over!!!')
     model.load_state_dict(model_dict, strict = False)
+    """
     
     
 
