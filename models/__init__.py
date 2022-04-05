@@ -40,3 +40,4 @@ import models.pidnet_large_uniPag_pappm_dfm3
 import models.pidnet_large_uniPagSim_pappm_dfm
 import models.pidnet_medium_uniPag_pappm_dfm
 import models.pidnet_medium_uniPag_dappm_dfm
+import models.pidnet_medium_uniPag_pappm_ddfm
