@@ -311,7 +311,67 @@ class Light_PAPPM(nn.Module):
        
         out = self.compression(torch.cat([x_,scale_out], 1)) + self.shortcut(x)
         return out
-    
+
+class Pag_PAPPM(nn.Module):
+    def __init__(self, inplanes, branch_planes, outplanes, BatchNorm=nn.BatchNorm2d):
+        super(Pag_PAPPM, self).__init__()
+        bn_mom = 0.1
+        self.scale1 = nn.Sequential(nn.AdaptiveAvgPool2d((8,8)),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale2 = nn.Sequential(nn.AdaptiveAvgPool2d((4,4)),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale3 = nn.Sequential(nn.AdaptiveAvgPool2d((2,2)),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale4 = nn.Sequential(nn.AdaptiveAvgPool2d((1,1)),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale0 = nn.Sequential(
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        
+        self.pag = PagFM4(branch_planes, branch_planes//2)
+
+      
+        self.compression = nn.Sequential(
+                                    BatchNorm(branch_planes * 4, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes * 4, outplanes, kernel_size=3, padding=1, bias=False),
+                                    )
+        
+        self.shortcut = nn.Sequential(
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=False),
+                                    )
+
+
+    def forward(self, x):    
+        scale_list = []
+
+        x_ = self.scale0(x)
+        scale_list.append(self.scale1(x))
+        scale_list.append(self.scale2(x))
+        scale_list.append(self.scale3(x))
+        scale_list.append(self.scale4(x))
+        
+        scale_list = self.pag(x_, scale_list)
+        scale_out = torch.cat(scale_list, 1)
+       
+        out = self.compression(scale_out) + self.shortcut(x)
+        return out
 
 class PagFM(nn.Module):
     def __init__(self, in_channels, mid_channels, after_relu=False, with_channel=False, BatchNorm=nn.BatchNorm2d):
@@ -358,6 +418,45 @@ class PagFM(nn.Module):
         x = (1-sim_map)*x + sim_map*y
         
         return x
+
+class PagFM4(nn.Module):
+    def __init__(self, in_channels, mid_channels, BatchNorm=nn.BatchNorm2d):
+        super(PagFM4, self).__init__()
+
+        self.f_x = nn.Sequential(
+                                nn.Conv2d(in_channels, mid_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(mid_channels)
+                                )
+        self.f_y = nn.ModuleList([nn.Sequential(
+                                nn.Conv2d(in_channels, mid_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(mid_channels)
+                                ) for _ in range(4)])
+        
+    def forward_single(self, x, y, x_k, y_q, input_size):
+        
+        
+        y_q = F.interpolate(y_q, size=[input_size[2], input_size[3]],
+                            mode='bilinear', align_corners=False)
+        
+        sim_map = torch.sigmoid(torch.sum(x_k * y_q, dim=1).unsqueeze(1))
+        
+        y = F.interpolate(y, size=[input_size[2], input_size[3]],
+                            mode='bilinear', align_corners=False)
+        x = (1-sim_map)*x + sim_map*y
+        
+        return x
+    
+    def forward(self, x, y_list):
+        input_size = x.size()
+        x_k = self.f_x(x)
+        
+        out = [self.forward_single(x, y, x_k, fy(y), input_size) for fy, y in zip(self.f_y, y_list)]
+        
+        return out
+    
+    
 
 # before relu        
 def PagFF(x, y, with_channel=False):
@@ -467,6 +566,7 @@ class BGFM(nn.Module):
         out = self.conv_out(out)
         
         return out
+    
 class DDFM(nn.Module):
     def __init__(self, in_channels, out_channels, BatchNorm=nn.BatchNorm2d):
         super(DDFM, self).__init__()
@@ -484,8 +584,8 @@ class DDFM(nn.Module):
     def forward(self, p, i, d):
         edge_att = torch.sigmoid(d)
         
-        p_add = self.conv_p((1-edge_att)*i + p + d)
-        i_add = self.conv_i(i + (1-edge_att)*p + d)
+        p_add = self.conv_p((1-edge_att)*i + p)
+        i_add = self.conv_i(i + edge_att*p)
         
         return p_add + i_add
     
@@ -523,7 +623,7 @@ class DFM3(nn.Module):
     
 
 class PAM(nn.Module):
-    # Pixel-Aggregation-Module (has not been tested)
+    # Pixel-Aggregation-Module
     def __init__(self, x_in_channels, y_in_channels, mid_channels, stride, BatchNorm=nn.BatchNorm2d):
         super(PAM, self).__init__()
         self.stride = stride
