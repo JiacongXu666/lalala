@@ -47,3 +47,4 @@ import models.pidnet_medium_uniPag_pappm112_ddfm
 import models.pidnet_medium_uniPag_ltdappm_ddfm
 import models.pidnet_medium_uniPag_pappm_bgfm
 import models.pidnet_medium_uniPag128_pappm_ddfm
+import models.pidnet_small_uniPag_pappm_ddfm
