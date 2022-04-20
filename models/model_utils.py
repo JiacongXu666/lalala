@@ -203,7 +203,7 @@ class Light_DAPPM(nn.Module):
         self.process3 = nn.Sequential(
                                     BatchNorm(branch_planes, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
-                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=1, padding=0, bias=False),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=1, bias=False),
                                     )
         self.process4 = nn.Sequential(
                                     BatchNorm(branch_planes, momentum=bn_mom),
@@ -589,6 +589,33 @@ class DDFM(nn.Module):
         
         return p_add + i_add
     
+
+class DDFMv2(nn.Module):
+    def __init__(self, in_channels, out_channels, BatchNorm=nn.BatchNorm2d):
+        super(DDFMv2, self).__init__()
+        self.conv_p = nn.Sequential(
+                                BatchNorm(in_channels),
+                                nn.ReLU(inplace=True),
+                                nn.Conv2d(in_channels, out_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(out_channels)
+                                )
+        self.conv_i = nn.Sequential(
+                                BatchNorm(in_channels),
+                                nn.ReLU(inplace=True),
+                                nn.Conv2d(in_channels, out_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(out_channels)
+                                )
+        
+    def forward(self, p, i, d):
+        edge_att = torch.sigmoid(d)
+        
+        p_add = self.conv_p((1-edge_att)*i + p)
+        i_add = self.conv_i(i + edge_att*p)
+        
+        return p_add + i_add
+
 class DFM(nn.Module):
     def __init__(self, in_channels, out_channels, BatchNorm=nn.BatchNorm2d):
         super(DFM, self).__init__()
@@ -597,7 +624,7 @@ class DFM(nn.Module):
                                 BatchNorm(in_channels),
                                 nn.ReLU(inplace=True),
                                 nn.Conv2d(in_channels, out_channels, 
-                                          kernel_size=1, padding=0, bias=False)                  
+                                          kernel_size=3, padding=1, bias=False)                  
                                 )
 
         
