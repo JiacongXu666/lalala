@@ -16,6 +16,8 @@ from torch.utils import data
 
 from configs import config
 
+y_k_size = 6
+x_k_size = 6
 
 class BaseDataset(data.Dataset):
     def __init__(self,
@@ -62,7 +64,7 @@ class BaseDataset(data.Dataset):
 
         return pad_image
 
-    def rand_crop(self, image, label):
+    def rand_crop(self, image, label, edge):
         h, w = image.shape[:-1]
         image = self.pad_image(image, h, w, self.crop_size,
                                (0.0, 0.0, 0.0))
@@ -70,16 +72,19 @@ class BaseDataset(data.Dataset):
         #                        (0,))
         label = self.pad_image(label, h, w, self.crop_size,
                                (self.ignore_label,))
+        edge = self.pad_image(edge, h, w, self.crop_size,
+                               (0.0,))
 
         new_h, new_w = label.shape
         x = random.randint(0, new_w - self.crop_size[1])
         y = random.randint(0, new_h - self.crop_size[0])
         image = image[y:y+self.crop_size[0], x:x+self.crop_size[1]]
         label = label[y:y+self.crop_size[0], x:x+self.crop_size[1]]
+        edge = edge[y:y+self.crop_size[0], x:x+self.crop_size[1]]
 
-        return image, label
+        return image, label, edge
 
-    def multi_scale_aug(self, image, label=None,
+    def multi_scale_aug(self, image, label=None, edge=None,
                         rand_scale=1, rand_crop=True):
         long_size = np.int(self.base_size * rand_scale + 0.5)
         h, w = image.shape[:2]
@@ -95,13 +100,16 @@ class BaseDataset(data.Dataset):
         if label is not None:
             label = cv2.resize(label, (new_w, new_h),
                                interpolation=cv2.INTER_NEAREST)
+            if edge is not None:
+                edge = cv2.resize(edge, (new_w, new_h),
+                                   interpolation=cv2.INTER_NEAREST)
         else:
             return image
 
         if rand_crop:
-            image, label = self.rand_crop(image, label)
+            image, label, edge = self.rand_crop(image, label, edge)
 
-        return image, label
+        return image, label, edge
 
     def resize_short_length(self, image, label=None, short_length=None, fit_stride=None, return_padding=False):
         h, w = image.shape[:2]
@@ -155,15 +163,24 @@ class BaseDataset(data.Dataset):
         return img
 
     def gen_sample(self, image, label,
-                   multi_scale=True, is_flip=True):
+                   multi_scale=True, is_flip=True, edge_pad=True, edge_size=4):
+        
+        edge = cv2.Canny(label, 0.1, 0.2)
+        kernel = np.ones((edge_size, edge_size), np.uint8)
+        if edge_pad:
+            edge = edge[y_k_size:-y_k_size, x_k_size:-x_k_size]
+            edge = np.pad(edge, ((y_k_size,y_k_size),(x_k_size,x_k_size)), mode='constant')
+        edge = (cv2.dilate(edge, kernel, iterations=1)>50)*1.0
+        
         if multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
-            image, label = self.multi_scale_aug(image, label,
+            image, label, edge = self.multi_scale_aug(image, label, edge,
                                                 rand_scale=rand_scale)
 
         image = self.random_brightness(image)
         image = self.input_transform(image)
         label = self.label_transform(label)
+        
 
         image = image.transpose((2, 0, 1))
 
@@ -171,6 +188,7 @@ class BaseDataset(data.Dataset):
             flip = np.random.choice(2) * 2 - 1
             image = image[:, :, ::flip]
             label = label[:, ::flip]
+            edge = edge[:, ::flip]
 
         if self.downsample_rate != 1:
             label = cv2.resize(
@@ -180,8 +198,15 @@ class BaseDataset(data.Dataset):
                 fy=self.downsample_rate,
                 interpolation=cv2.INTER_NEAREST
             )
+            edge = cv2.resize(
+                edge,
+                None,
+                fx=self.downsample_rate,
+                fy=self.downsample_rate,
+                interpolation=cv2.INTER_NEAREST
+            )
 
-        return image, label
+        return image, label, edge
 
     def reduce_zero_label(self, labelmap):
         labelmap = np.array(labelmap)

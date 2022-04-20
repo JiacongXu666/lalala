@@ -117,12 +117,8 @@ class Cityscapes(BaseDataset):
                            cv2.IMREAD_GRAYSCALE)
         label = self.convert_label(label)
 
-        image, label = self.gen_sample(image, label, 
-                                self.multi_scale, self.flip)
-        
-        edge = cv2.Canny(label, 0.1, 0.2)
-        kernel = np.ones((self.bd_dilate_size,self.bd_dilate_size), np.uint8)
-        edge = (cv2.dilate(edge, kernel, iterations=1)>50)*1.0
+        image, label, edge = self.gen_sample(image, label, 
+                                self.multi_scale, self.flip, edge_size=self.bd_dilate_size)
 
         return image.copy(), label.copy(), edge.copy(), np.array(size), name
 
