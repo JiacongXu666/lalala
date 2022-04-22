@@ -38,6 +38,7 @@ import models.diff_ddrnet_23
 #import models.pidnet_large_uniPag_pappm_dfm
 import models.pidnet_large_uniPag_pappm_ddfm
 import models.pidnet_large_uniPag128_dappm_dfm3
+import models.pidnet_large_uniPag128_dappm112_dfm3
 #import models.pidnet_large_uniPag_pappm112_ddfm
 #import models.pidnet_large_uniPag_pappm_dfm3
 #import models.pidnet_large_uniPagSim_pappm_dfm
