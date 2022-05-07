@@ -49,7 +49,7 @@ class FullModel(nn.Module):
             outputs[i] = F.interpolate(outputs[i], size=(
                 h, w), mode='bilinear', align_corners=config.MODEL.ALIGN_CORNERS)
 
-    acc  = self.pixel_acc(outputs[1], labels)
+    acc  = self.pixel_acc(outputs[-2], labels)
     loss_s = self.sem_loss(outputs[:-1], labels)
     loss_b = self.bd_loss(outputs[-1], bd_gt)
     if self.sb_loss is not None:

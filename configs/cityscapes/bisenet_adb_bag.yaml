@@ -15,14 +15,14 @@ DATASET:
   TRAIN_SET: 'list/cityscapes/train.lst'
   NUM_CLASSES: 19
 MODEL:
-  NAME: pidnet_small_uniPag_pappm_ddfm
-  NUM_OUTPUTS: 2
-  PRETRAINED: "pretrained_models/imagenet/PIDNet_S_uniPag_nonD.pth.tar"
+  NAME: bisenet
+  NUM_OUTPUTS: 3
+  PRETRAINED: "pretrained_models/imagenet/resnet18.pth"
 LOSS:
   USE_OHEM: true
   OHEMTHRES: 0.9
   OHEMKEEP: 131072
-  BALANCE_WEIGHTS: [0.4, 1.0]
+  BALANCE_WEIGHTS: [0.4, 0.4, 1.0]
   SB_WEIGHTS: 1.0
 TRAIN:
   IMAGE_SIZE:
@@ -52,5 +52,5 @@ TEST:
   BATCH_SIZE_PER_GPU: 6
   FLIP_TEST: false
   MULTI_SCALE: false
-  MODEL_FILE: 
+  MODEL_FILE: ''
   OUTPUT_INDEX: 1
