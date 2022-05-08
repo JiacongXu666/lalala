@@ -24,6 +24,7 @@ from __future__ import print_function
 #import models.hrednet_full_reduced
 #import models.hrednet_full_reduced_small
 import models.bisenet
+import models.ddrnet_23_adb_bag
 #import models.hrunet
 #mport models.hrunetv2
 #import models.diff_ddrnet_23
@@ -38,7 +39,7 @@ import models.bisenet
 #import models.pidnet_large_uniPag_pappm_dfm
 #import models.pidnet_large_uniPag_pappm_ddfm
 #import models.pidnet_large_uniPag128_dappm_dfm3
-#import models.pidnet_large_uniPag128_dappm112_dfm3
+import models.pidnet_large_uniPag128_dappm112_dfm3
 #import models.pidnet_large_uniPag128_dappm112_dfm3_camvid
 #import models.pidnet_large_uniPag128_dappm112_ddfm
 #import models.pidnet_large_uniPag_pappm112_ddfm
@@ -52,5 +53,5 @@ import models.bisenet
 #import models.pidnet_medium_uniPag_ltdappm_ddfm
 #import models.pidnet_medium_uniPag_pappm_bgfm
 #import models.pidnet_medium_uniPag128_dappm96_dfm3
-#import models.pidnet_small_uniPag_pappm_ddfm
+import models.pidnet_small_uniPag_pappm_ddfm
 #import models.pidnet_small_uniPag_pappm_ddfm_camvid

@@ -53,4 +53,4 @@ TEST:
   FLIP_TEST: false
   MULTI_SCALE: false
   MODEL_FILE: ''
-  OUTPUT_INDEX: 1
+  OUTPUT_INDEX: 2
