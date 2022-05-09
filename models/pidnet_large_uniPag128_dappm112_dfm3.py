@@ -11,6 +11,7 @@ import logging
 
 BatchNorm2d = nn.BatchNorm2d
 bn_mom = 0.1
+algc = False
     
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -92,7 +93,136 @@ class Bottleneck(nn.Module):
             return out
         else:
             return self.relu(out)
+        
+class DAPPM(nn.Module):
+    def __init__(self, inplanes, branch_planes, outplanes, BatchNorm=nn.BatchNorm2d):
+        super(DAPPM, self).__init__()
+        bn_mom = 0.1
+        self.scale1 = nn.Sequential(nn.AvgPool2d(kernel_size=5, stride=2, padding=2),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale2 = nn.Sequential(nn.AvgPool2d(kernel_size=9, stride=4, padding=4),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale3 = nn.Sequential(nn.AvgPool2d(kernel_size=17, stride=8, padding=8),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale4 = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.scale0 = nn.Sequential(
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
+                                    )
+        self.process1 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=3, padding=1, bias=False),
+                                    )
+        self.process2 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=3, padding=1, bias=False),
+                                    )
+        self.process3 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=3, padding=1, bias=False),
+                                    )
+        self.process4 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=3, padding=1, bias=False),
+                                    )        
+        self.compression = nn.Sequential(
+                                    BatchNorm(branch_planes * 5, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes * 5, outplanes, kernel_size=1, bias=False),
+                                    )
+        self.shortcut = nn.Sequential(
+                                    BatchNorm(inplanes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=False),
+                                    )
 
+    def forward(self, x):
+
+        #x = self.downsample(x)
+        width = x.shape[-1]
+        height = x.shape[-2]        
+        x_list = []
+
+        x_list.append(self.scale0(x))
+        x_list.append(self.process1((F.interpolate(self.scale1(x),
+                        size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_list[0])))
+        x_list.append((self.process2((F.interpolate(self.scale2(x),
+                        size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_list[1]))))
+        x_list.append(self.process3((F.interpolate(self.scale3(x),
+                        size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_list[2])))
+        x_list.append(self.process4((F.interpolate(self.scale4(x),
+                        size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_list[3])))
+       
+        out = self.compression(torch.cat(x_list, 1)) + self.shortcut(x)
+        return out 
+    
+class PagFM(nn.Module):
+    def __init__(self, in_channels, mid_channels, after_relu=False, with_channel=False, BatchNorm=nn.BatchNorm2d):
+        super(PagFM, self).__init__()
+        self.with_channel = with_channel
+        self.after_relu = after_relu
+        self.f_x = nn.Sequential(
+                                nn.Conv2d(in_channels, mid_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(mid_channels)
+                                )
+        self.f_y = nn.Sequential(
+                                nn.Conv2d(in_channels, mid_channels, 
+                                          kernel_size=1, bias=False),
+                                BatchNorm(mid_channels)
+                                )
+        if with_channel:
+            self.up = nn.Sequential(
+                                    nn.Conv2d(mid_channels, in_channels, 
+                                              kernel_size=1, bias=False),
+                                    BatchNorm(in_channels)
+                                   )
+        if after_relu:
+            self.relu = nn.ReLU(inplace=True)
+        
+    def forward(self, x, y):
+        input_size = x.size()
+        if self.after_relu:
+            y = self.relu(y)
+            x = self.relu(x)
+        
+        y_q = self.f_y(y)
+        y_q = F.interpolate(y_q, size=[input_size[2], input_size[3]],
+                            mode='bilinear', align_corners=algc)
+        x_k = self.f_x(x)
+        
+        if self.with_channel:
+            sim_map = torch.sigmoid(self.up(x_k * y_q))
+        else:
+            sim_map = torch.sigmoid(torch.sum(x_k * y_q, dim=1).unsqueeze(1))
+        
+        y = F.interpolate(y, size=[input_size[2], input_size[3]],
+                            mode='bilinear', align_corners=algc)
+        x = (1-sim_map)*x + sim_map*y
+        
+        return x
 
 class segmenthead(nn.Module):
 
@@ -115,7 +245,7 @@ class segmenthead(nn.Module):
             width = x.shape[-1] * self.scale_factor
             out = F.interpolate(out,
                         size=[height, width],
-                        mode='bilinear', align_corners=False)
+                        mode='bilinear', align_corners=algc)
 
         return out
 
@@ -151,8 +281,8 @@ class PIDNet_L(nn.Module):
                                           nn.Conv2d(planes * 8, highres_planes, kernel_size=1, bias=False),
                                           BatchNorm2d(highres_planes, momentum=bn_mom),
                                           )
-        self.pag3 = model_utils.PagFM(highres_planes, planes)
-        self.pag4 = model_utils.PagFM(highres_planes, planes)
+        self.pag3 = PagFM(highres_planes, planes)
+        self.pag4 = PagFM(highres_planes, planes)
         
         self.diff3 = nn.Sequential(
                                     nn.Conv2d(planes * 4, planes*2, kernel_size=3, padding=1, bias=False),
@@ -177,7 +307,7 @@ class PIDNet_L(nn.Module):
 
         self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
 
-        self.spp = model_utils.DAPPM(planes * 16, spp_planes, planes * 4)
+        self.spp = DAPPM(planes * 16, spp_planes, planes * 4)
 
         self.dfm = model_utils.DFM(planes * 4, planes * 4)
 
@@ -245,7 +375,7 @@ class PIDNet_L(nn.Module):
         x_d = x_d + F.interpolate(
                         self.diff3(x),
                         size=[height_output, width_output],
-                        mode='bilinear', align_corners=False)
+                        mode='bilinear', align_corners=algc)
         if self.augment:
             temp_p = x_
         
@@ -257,7 +387,7 @@ class PIDNet_L(nn.Module):
         x_d = x_d + F.interpolate(
                         self.diff4(x),
                         size=[height_output, width_output],
-                        mode='bilinear', align_corners=False)
+                        mode='bilinear', align_corners=algc)
         if self.augment:
             temp_d = x_d
             
@@ -266,7 +396,7 @@ class PIDNet_L(nn.Module):
         x = F.interpolate(
                         self.spp(self.layer5(x)),
                         size=[height_output, width_output],
-                        mode='bilinear', align_corners=False)
+                        mode='bilinear', align_corners=algc)
 
         x_ = self.final_layer(self.dfm(x_, x, x_d))
 

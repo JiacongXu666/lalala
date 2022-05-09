@@ -53,9 +53,9 @@ class FullModel(nn.Module):
     loss_s = self.sem_loss(outputs[:-1], labels)
     loss_b = self.bd_loss(outputs[-1], bd_gt)
     if self.sb_loss is not None:
-        filler = torch.ones_like(labels) * 255
+        filler = torch.ones_like(labels) * config.TRAIN.IGNORE_LABEL
         bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>0.8, labels, filler)
-        loss_sb = self.sb_loss(outputs[1], bd_label)
+        loss_sb = self.sb_loss(outputs[-2], bd_label)
         loss = loss_s + loss_b + loss_sb
     else:
         loss = loss_s + loss_b

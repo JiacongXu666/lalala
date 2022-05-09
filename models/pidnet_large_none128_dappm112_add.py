@@ -52,40 +52,6 @@ class BasicBlock(nn.Module):
             return out
         else:
             return self.relu(out)
-        
-class SimpleBlock(nn.Module):
-    expansion = 1
-
-    def __init__(self, inplanes, planes, stride=1, downsample=None, no_relu=False):
-        super(SimpleBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = BatchNorm2d(planes, momentum=bn_mom)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
-        self.bn2 = BatchNorm2d(planes, momentum=bn_mom)
-        self.downsample = downsample
-        self.stride = stride
-        self.no_relu = no_relu
-
-    def forward(self, x):
-        residual = x
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-
-        if self.no_relu:
-            return out
-        else:
-            return self.relu(out)
 
 class Bottleneck(nn.Module):
     expansion = 2
@@ -127,10 +93,10 @@ class Bottleneck(nn.Module):
             return out
         else:
             return self.relu(out)
-
-class PAPPM(nn.Module):
+        
+class DAPPM(nn.Module):
     def __init__(self, inplanes, branch_planes, outplanes, BatchNorm=nn.BatchNorm2d):
-        super(PAPPM, self).__init__()
+        super(DAPPM, self).__init__()
         bn_mom = 0.1
         self.scale1 = nn.Sequential(nn.AvgPool2d(kernel_size=5, stride=2, padding=2),
                                     BatchNorm(inplanes, momentum=bn_mom),
@@ -152,55 +118,66 @@ class PAPPM(nn.Module):
                                     nn.ReLU(inplace=True),
                                     nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
                                     )
-
         self.scale0 = nn.Sequential(
                                     BatchNorm(inplanes, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
                                     nn.Conv2d(inplanes, branch_planes, kernel_size=1, bias=False),
                                     )
-        
-        self.scale_process = nn.Sequential(
-                                    BatchNorm(branch_planes*4, momentum=bn_mom),
+        self.process1 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
-                                    nn.Conv2d(branch_planes*4, branch_planes*4, kernel_size=3, padding=1, groups=4, bias=False),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=3, padding=1, bias=False),
                                     )
-
-      
+        self.process2 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=3, padding=1, bias=False),
+                                    )
+        self.process3 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=3, padding=1, bias=False),
+                                    )
+        self.process4 = nn.Sequential(
+                                    BatchNorm(branch_planes, momentum=bn_mom),
+                                    nn.ReLU(inplace=True),
+                                    nn.Conv2d(branch_planes, branch_planes, kernel_size=3, padding=1, bias=False),
+                                    )        
         self.compression = nn.Sequential(
                                     BatchNorm(branch_planes * 5, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
                                     nn.Conv2d(branch_planes * 5, outplanes, kernel_size=1, bias=False),
                                     )
-        
         self.shortcut = nn.Sequential(
                                     BatchNorm(inplanes, momentum=bn_mom),
                                     nn.ReLU(inplace=True),
                                     nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=False),
                                     )
 
-
     def forward(self, x):
 
         #x = self.downsample(x)
         width = x.shape[-1]
         height = x.shape[-2]        
-        scale_list = []
+        x_list = []
 
-        x_= self.scale0(x)
-        scale_list.append(F.interpolate(self.scale1(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_)
-        scale_list.append(F.interpolate(self.scale2(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_)
-        scale_list.append(F.interpolate(self.scale3(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_)
-        scale_list.append(F.interpolate(self.scale4(x), size=[height, width],
-                        mode='bilinear', align_corners=algc)+x_)
-        
-        scale_out = self.scale_process(torch.cat(scale_list, 1))
+        x_list.append(self.scale0(x))
+        x_list.append(self.process1((F.interpolate(self.scale1(x),
+                        size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_list[0])))
+        x_list.append((self.process2((F.interpolate(self.scale2(x),
+                        size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_list[1]))))
+        x_list.append(self.process3((F.interpolate(self.scale3(x),
+                        size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_list[2])))
+        x_list.append(self.process4((F.interpolate(self.scale4(x),
+                        size=[height, width],
+                        mode='bilinear', align_corners=algc)+x_list[3])))
        
-        out = self.compression(torch.cat([x_,scale_out], 1)) + self.shortcut(x)
-        return out
-
+        out = self.compression(torch.cat(x_list, 1)) + self.shortcut(x)
+        return out 
+    
 class PagFM(nn.Module):
     def __init__(self, in_channels, mid_channels, after_relu=False, with_channel=False, BatchNorm=nn.BatchNorm2d):
         super(PagFM, self).__init__()
@@ -246,7 +223,7 @@ class PagFM(nn.Module):
         x = (1-sim_map)*x + sim_map*y
         
         return x
-    
+
 class segmenthead(nn.Module):
 
     def __init__(self, inplanes, interplanes, outplanes, scale_factor=None):
@@ -272,10 +249,10 @@ class segmenthead(nn.Module):
 
         return out
 
-class PIDNet_M(nn.Module):
+class PIDNet_L(nn.Module):
 
     def __init__(self, block, layers, num_classes=19, planes=64, spp_planes=128, head_planes=128, augment=False):
-        super(PIDNet_M, self).__init__()
+        super(PIDNet_L, self).__init__()
 
         highres_planes = planes * 2
         self.augment = augment
@@ -308,8 +285,8 @@ class PIDNet_M(nn.Module):
         self.pag4 = PagFM(highres_planes, planes)
         
         self.diff3 = nn.Sequential(
-                                    nn.Conv2d(planes * 4, planes*1, kernel_size=3, padding=1, bias=False),
-                                    BatchNorm2d(planes*1, momentum=bn_mom),
+                                    nn.Conv2d(planes * 4, planes*2, kernel_size=3, padding=1, bias=False),
+                                    BatchNorm2d(planes*2, momentum=bn_mom),
                                     )
         self.diff4 = nn.Sequential(
                                  nn.Conv2d(planes * 8, highres_planes, kernel_size=3, padding=1, bias=False),
@@ -319,20 +296,20 @@ class PIDNet_M(nn.Module):
         
         
 
-        self.layer3_ = self._make_layer(block, planes * 2, highres_planes, 2)
-        self.layer3_d = self._make_single_layer(block, planes * 2, planes)
+        self.layer3_ = self._make_layer(block, planes * 2, highres_planes, 3)
+        self.layer3_d = self._make_single_layer(block, planes * 2, highres_planes)
 
-        self.layer4_ = self._make_layer(block, highres_planes, highres_planes, 2)
-        self.layer4_d = self._make_layer(Bottleneck, planes, planes, 1)
+        self.layer4_ = self._make_layer(block, highres_planes, highres_planes, 3)
+        self.layer4_d = self._make_single_layer(block, highres_planes, highres_planes)
 
         self.layer5_ = self._make_layer(Bottleneck, highres_planes, highres_planes, 1)
-        self.layer5_d = self._make_layer(Bottleneck, planes*2, highres_planes, 1)
+        self.layer5_d = self._make_layer(Bottleneck, highres_planes, highres_planes, 1)
 
         self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
 
-        self.spp = PAPPM(planes * 16, spp_planes, planes * 4)
+        self.spp = DAPPM(planes * 16, spp_planes, planes * 4)
 
-        self.dfm = model_utils.DDFM(planes * 4, planes * 4)
+        self.dfm = model_utils.DFM(planes * 4, planes * 4)
 
         if self.augment:
             self.seghead_p = segmenthead(highres_planes, head_planes, num_classes)
@@ -394,7 +371,6 @@ class PIDNet_M(nn.Module):
         x_d = self.layer3_d(x)
         
         x = self.relu(self.layer3(x))
-        x_ = self.pag3(x_, self.compression3(x))
         x_d = x_d + F.interpolate(
                         self.diff3(x),
                         size=[height_output, width_output],
@@ -406,7 +382,7 @@ class PIDNet_M(nn.Module):
         x_ = self.layer4_(self.relu(x_))
         x_d = self.layer4_d(self.relu(x_d))
         
-        x_ = self.pag4(x_, self.compression4(x))
+
         x_d = x_d + F.interpolate(
                         self.diff4(x),
                         size=[height_output, width_output],
@@ -421,7 +397,7 @@ class PIDNet_M(nn.Module):
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=algc)
 
-        x_ = self.final_layer(self.dfm(x_, x, x_d))
+        x_ = self.final_layer(x_ + x + x_d)
 
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
@@ -431,7 +407,7 @@ class PIDNet_M(nn.Module):
             return x_      
 
 def PIDNet_imagenet(cfg, pretrained=True):
-    model = PIDNet_M(BasicBlock, [2, 2, 3, 3], num_classes=19, planes=64, spp_planes=96, head_planes=128, augment=True)
+    model = PIDNet_L(BasicBlock, [3, 3, 4, 4], num_classes=19, planes=64, spp_planes=112, head_planes=256, augment=True)
     if pretrained:
         pretrained_state = torch.load(cfg.MODEL.PRETRAINED, map_location='cpu')['state_dict'] 
         model_dict = model.state_dict()
@@ -450,13 +426,12 @@ def get_seg_model(cfg, **kwargs):
     return model
 
 if __name__ == '__main__':
-    
-    
+    """
     device = torch.device('cuda')
     #torch.backends.cudnn.enabled = True
     #torch.backends.cudnn.benchmark = True
     
-    model = PIDNet_M(BasicBlock, [2, 2, 3, 3], num_classes=19, planes=64, spp_planes=96, head_planes=128, augment=False)
+    model = PIDNet_L(BasicBlock, [3, 3, 4, 4], num_classes=19, planes=64, spp_planes=96, head_planes=256, augment=False)
     model.eval()
     model.to(device)
     iterations = None
@@ -495,11 +470,11 @@ if __name__ == '__main__':
     torch.cuda.empty_cache()
     FPS = 1000 / latency
     print(FPS)
-    
-        
     """
-    model = PIDNet_M(BasicBlock, [2, 2, 3, 3], num_classes=19, planes=64, spp_planes=96, head_planes=128, augment=True)
-    filename = 'D:/ImageNet/pidnet_m_nond/model_best.pth.tar'
+        
+
+    model = PIDNet_L(BasicBlock, [3, 3, 4, 4], num_classes=19, planes=64, spp_planes=112, head_planes=256, augment=True)
+    filename = 'D:/ImageNet/imagenet_test/checkpoints/imagenet/pidnet_l_nonD/model_best.pth.tar'
     pretrained_state = torch.load(filename, map_location='cpu')['state_dict'] 
     model_dict = model.state_dict()
     pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
@@ -510,7 +485,6 @@ if __name__ == '__main__':
     logging.info('Over!!!')
     model.load_state_dict(model_dict, strict = False)
     
-    """
     
 
 

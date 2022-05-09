@@ -81,7 +81,42 @@ class COCOStuff(BaseDataset):
         image = cv2.resize(image, size, interpolation=cv2.INTER_LINEAR)
         label = cv2.resize(label, size, interpolation=cv2.INTER_NEAREST)
         return image, label
+    
+    def gen_sample_test(self, image, label):
+        
+        edge = cv2.Canny(label, 0.1, 0.2)
+        kernel = np.ones((self.bd_dilate_size, self.bd_dilate_size), np.uint8)
+        edge = (cv2.dilate(edge, kernel, iterations=1)>50)*1.0
+        
+            
+        image, label, edge = self.rand_crop(image, label, edge)
+            
+        image = self.random_brightness(image)
+        image = self.input_transform(image)
+        label = self.label_transform(label)
+        
 
+        image = image.transpose((2, 0, 1))
+
+        if self.downsample_rate != 1:
+            label = cv2.resize(
+                label,
+                None,
+                fx=self.downsample_rate,
+                fy=self.downsample_rate,
+                interpolation=cv2.INTER_NEAREST
+            )
+            edge = cv2.resize(
+                edge,
+                None,
+                fx=self.downsample_rate,
+                fy=self.downsample_rate,
+                interpolation=cv2.INTER_NEAREST
+            )
+
+        return image, label, edge
+    
+    
     def __getitem__(self, index):
         item = self.files[index]
         name = item["name"]
@@ -123,7 +158,11 @@ class COCOStuff(BaseDataset):
 
             return image.copy(), label.copy(), np.array(size), name
         """
+        
         image, label = self.resize_short_length(image, label, short_length=self.base_size)
-        image, label, edge = self.gen_sample(image, label, self.multi_scale, self.flip, edge_pad=False, edge_size=self.bd_dilate_size)
+        if 'test' in self.list_path:
+            image, label, edge = self.gen_sample_test(image, label)
+        else:
+            image, label, edge = self.gen_sample(image, label, self.multi_scale, self.flip, edge_pad=False, edge_size=self.bd_dilate_size)
 
         return image.copy(), label.copy(), edge.copy(), np.array(size), name

@@ -328,7 +328,7 @@ class PIDNet_M(nn.Module):
         self.layer5_ = self._make_layer(Bottleneck, highres_planes, highres_planes, 1)
         self.layer5_d = self._make_layer(Bottleneck, planes*2, highres_planes, 1)
 
-        self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
+        self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2)
 
         self.spp = PAPPM(planes * 16, spp_planes, planes * 4)
 
@@ -431,7 +431,7 @@ class PIDNet_M(nn.Module):
             return x_      
 
 def PIDNet_imagenet(cfg, pretrained=True):
-    model = PIDNet_M(BasicBlock, [2, 2, 3, 3], num_classes=19, planes=64, spp_planes=96, head_planes=128, augment=True)
+    model = PIDNet_M(BasicBlock, [2, 2, 3, 3], num_classes=171, planes=64, spp_planes=96, head_planes=128, augment=True)
     if pretrained:
         pretrained_state = torch.load(cfg.MODEL.PRETRAINED, map_location='cpu')['state_dict'] 
         model_dict = model.state_dict()

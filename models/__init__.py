@@ -40,6 +40,8 @@ import models.ddrnet_23_adb_bag
 #import models.pidnet_large_uniPag_pappm_ddfm
 #import models.pidnet_large_uniPag128_dappm_dfm3
 import models.pidnet_large_uniPag128_dappm112_dfm3
+import models.pidnet_large_uniPag128_dappm112_dfm3_nonpre
+import models.pidnet_large_add128_dappm112_add
 #import models.pidnet_large_uniPag128_dappm112_dfm3_camvid
 #import models.pidnet_large_uniPag128_dappm112_ddfm
 #import models.pidnet_large_uniPag_pappm112_ddfm
