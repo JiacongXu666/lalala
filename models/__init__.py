@@ -56,3 +56,4 @@ import models.pidnet_large_uniPag128_dappm112_dfm3
 import models.pidnet_small_uniPag_pappm_ddfm
 import models.pidnet_small_uniPag_pappm_ddfm_algct
 #import models.pidnet_small_uniPag_pappm_ddfm_camvid
+import models.pidnet_small_uniPag_pappm_ddfm_coco
