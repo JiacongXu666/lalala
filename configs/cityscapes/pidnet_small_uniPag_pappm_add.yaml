@@ -18,6 +18,7 @@ MODEL:
   NAME: pidnet_small_uniPag_pappm_add
   NUM_OUTPUTS: 2
   PRETRAINED: "pretrained_models/imagenet/PIDNet_S_uniPag_nonD.pth.tar"
+  ALIGN_CORNERS: false
 LOSS:
   USE_OHEM: true
   OHEMTHRES: 0.9
