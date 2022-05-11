@@ -26,10 +26,18 @@ class CrossEntropy(nn.Module):
         if config.MODEL.NUM_OUTPUTS == 1:
             score = [score]
 
-        weights = config.LOSS.BALANCE_WEIGHTS
-        assert len(weights) == len(score)
+        #weights = config.LOSS.BALANCE_WEIGHTS
+        balance_weights = config.LOSS.BALANCE_WEIGHTS
+        sb_weights = config.LOSS.SB_WEIGHTS
+        if len(balance_weights) == len(score):
+            return sum([w * self._forward(x, target) for (w, x) in zip(balance_weights, score)])
+        elif len(score) == 1:
+            return sb_weights * self._forward(score[0], target)
+        
+        else:
+            raise ValueError("lengths of prediction and target are not identical!")
 
-        return sum([w * self._forward(x, target) for (w, x) in zip(weights, score)])
+        
 
 
 class OhemCrossEntropy(nn.Module):
