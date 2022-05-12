@@ -281,8 +281,6 @@ class PIDNet_L(nn.Module):
                                           nn.Conv2d(planes * 8, highres_planes, kernel_size=1, bias=False),
                                           BatchNorm2d(highres_planes, momentum=bn_mom),
                                           )
-        self.pag3 = PagFM(highres_planes, planes)
-        self.pag4 = PagFM(highres_planes, planes)
         
         self.diff3 = nn.Sequential(
                                     nn.Conv2d(planes * 4, planes*2, kernel_size=3, padding=1, bias=False),
@@ -371,7 +369,10 @@ class PIDNet_L(nn.Module):
         x_d = self.layer3_d(x)
         
         x = self.relu(self.layer3(x))
-        x_ = self.pag3(x_, self.compression3(x))
+        x_ = x_ + F.interpolate(
+                        self.compression3(x),
+                        size=[height_output, width_output],
+                        mode='bilinear', align_corners=algc)
         x_d = x_d + F.interpolate(
                         self.diff3(x),
                         size=[height_output, width_output],
@@ -383,7 +384,10 @@ class PIDNet_L(nn.Module):
         x_ = self.layer4_(self.relu(x_))
         x_d = self.layer4_d(self.relu(x_d))
         
-        x_ = self.pag4(x_, self.compression4(x))
+        x_ = x_ + F.interpolate(
+                        self.compression4(x),
+                        size=[height_output, width_output],
+                        mode='bilinear', align_corners=algc)
         x_d = x_d + F.interpolate(
                         self.diff4(x),
                         size=[height_output, width_output],
@@ -427,12 +431,12 @@ def get_seg_model(cfg, **kwargs):
     return model
 
 if __name__ == '__main__':
-    """
+    
     device = torch.device('cuda')
     #torch.backends.cudnn.enabled = True
     #torch.backends.cudnn.benchmark = True
     
-    model = PIDNet_L(BasicBlock, [3, 3, 4, 4], num_classes=19, planes=64, spp_planes=96, head_planes=256, augment=False)
+    model = PIDNet_L(BasicBlock, [3, 3, 4, 4], num_classes=19, planes=64, spp_planes=112, head_planes=256, augment=False)
     model.eval()
     model.to(device)
     iterations = None
@@ -471,9 +475,9 @@ if __name__ == '__main__':
     torch.cuda.empty_cache()
     FPS = 1000 / latency
     print(FPS)
-    """
+    
         
-
+"""
     model = PIDNet_L(BasicBlock, [3, 3, 4, 4], num_classes=19, planes=64, spp_planes=112, head_planes=256, augment=True)
     filename = 'D:/ImageNet/imagenet_test/checkpoints/imagenet/pidnet_l_nonD/model_best.pth.tar'
     pretrained_state = torch.load(filename, map_location='cpu')['state_dict'] 
@@ -486,6 +490,6 @@ if __name__ == '__main__':
     logging.info('Over!!!')
     model.load_state_dict(model_dict, strict = False)
     
-    
+"""    
 
 

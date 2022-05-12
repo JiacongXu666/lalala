@@ -45,6 +45,7 @@ import models.pidnet_large_add128_dappm112_add_nonpre
 import models.pidnet_large_uniPag128_dappm112_add_nonpre
 import models.pidnet_large_none128_dappm112_add
 import models.pidnet_large_add128_dappm112_add
+import models.pidnet_large_add128_dappm112_dfm3
 import models.pidnet_large_uniPag128_dappm112_add
 #import models.pidnet_large_uniPag128_dappm112_dfm3_camvid
 #import models.pidnet_large_uniPag128_dappm112_ddfm
