@@ -15,9 +15,9 @@ DATASET:
   TRAIN_SET: 'list/cocostuff/train.lst'
   NUM_CLASSES: 171
 MODEL:
-  NAME: pidnet_small_uniPag_pappm_ddfm_coco256
+  NAME: pidnet_medium_uniPag_pappm_ddfm_coco256
   NUM_OUTPUTS: 2
-  PRETRAINED: "pretrained_models/imagenet/PIDNet_S_uniPag_nonD.pth.tar"
+  PRETRAINED: "pretrained_models/imagenet/PIDNet_M_uniPag_nonD.pth.tar"
   ALIGN_CORNERS: false
 LOSS:
   USE_OHEM: true

@@ -47,14 +47,14 @@ import models.pidnet_large_none128_dappm112_add
 import models.pidnet_large_add128_dappm112_add
 import models.pidnet_large_add128_dappm112_dfm3
 import models.pidnet_large_uniPag128_dappm112_add
-#import models.pidnet_large_uniPag128_dappm112_dfm3_camvid
+import models.pidnet_large_uniPag128_dappm112_dfm3_coco256
 #import models.pidnet_large_uniPag128_dappm112_ddfm
 #import models.pidnet_large_uniPag_pappm112_ddfm
 #import models.pidnet_large_uniPag_pappm_dfm3
 #import models.pidnet_large_uniPagSim_pappm_dfm
 #import models.pidnet_medium_uniPag_pappm_dfm
 #import models.pidnet_medium_uniPag_dappm_dfm
-#import models.pidnet_medium_uniPag_pappm_ddfm
+import models.pidnet_medium_uniPag_pappm_ddfm_coco256
 #import models.pidnet_medium_uniPag_pappm_ddfm_camvid
 #import models.pidnet_medium_uniPag_dappm112_ddfm
 #import models.pidnet_medium_uniPag_ltdappm_ddfm
